@@ -1,0 +1,117 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+require 'yaml'
+settings = YAML.load_file './vagrant/vagrant.yml'
+hosts = YAML.load_file '../inventories/hosts.yml'
+project_name = File.basename(File.dirname(File.expand_path("../", __FILE__)))
+Vagrant.configure(2) do |config|
+  config.ssh.insert_key = 'true'
+  config.ssh.keep_alive = 'true'
+
+  config.vm.define "control", primary: true do |control|
+    setting=settings['vm']['control']
+    control.vm.box = setting['box']
+    control.vm.box_check_update = false
+    control_ip=hosts['all']['children']['dev']['hosts']['sandbox']['ansible_host']
+    control.vm.network setting['network'], ip: control_ip
+
+    control.vm.provision 'shell', inline: 'echo "root:vagrant" | chpasswd'
+
+    control.vm.synced_folder "../playbooks", "/opt/host/playbooks"
+    control.vm.synced_folder "../templates", "/opt/host/templates"
+    control.vm.synced_folder "../vars", "/opt/host/vars"
+    control.vm.synced_folder "../filter_plugins", "/opt/host/filter_plugins"
+    control.vm.synced_folder "../inventories", "/opt/host/inventories"
+    control.vm.synced_folder "../.adot", "/opt/host/.adot"
+
+    control.vm.provider "virtualbox" do |vb|
+      vb.gui = false
+      vb.name = project_name + '-control'
+      vb.memory = setting['memory']
+      vb.customize ["modifyvm", :id, "--ioapic", "on", "--vram", "256", "--clipboard", "bidirectional"]
+      vb.cpus = setting['cpu']
+    end
+    control.vm.provision "install-docker", type: "shell", inline: <<-SHELL
+        yum remove docker \
+          docker-client \
+          docker-client-latest \
+          docker-common \
+          docker-latest \
+          docker-latest-logrotate \
+          docker-logrotate \
+          docker-selinux \
+          docker-engine-selinux \
+          docker-engine
+        yum install -y yum-utils \
+          device-mapper-persistent-data \
+          lvm2 \
+          dos2unix \
+          vim
+        yum-config-manager \
+          --add-repo \
+          https://download.docker.com/linux/centos/docker-ce.repo
+        yum-config-manager --enable docker-ce-edge
+        yum install -y docker-ce
+    SHELL
+
+    control.vm.provision "config-docker", type: "shell", inline: <<-SHELL
+        mkdir -p /etc/systemd/system/docker.service.d
+        echo '[Service]' > /etc/systemd/system/docker.service.d/docker.conf
+        echo 'ExecStart=' >> /etc/systemd/system/docker.service.d/docker.conf
+        echo 'ExecStart=/usr/bin/dockerd -H tcp://0.0.0.0:2375 -H unix://var/run/docker.sock' >> /etc/systemd/system/docker.service.d/docker.conf
+        systemctl enable docker
+        systemctl daemon-reload
+        systemctl restart docker
+    SHELL
+
+    control.vm.provision "docker-helloworld", type: "shell", inline: <<-SHELL
+      docker run hello-world
+    SHELL
+    control.vm.provision "vagrantrc", type: "file", source: "vagrant/vagrantrc.sh", destination: "/tmp/.vagrantrc"
+    control.vm.provision "vagrantrc-update", type: "shell", privileged: true, inline: <<-SHELL
+      mv /tmp/.vagrantrc /root/.vagrantrc
+      chmod 644 /root/.vagrantrc
+      dos2unix /root/.vagrantrc
+      echo "export PROJECT_NAME=#{project_name}" >> /root/.vagrantrc
+      echo "export ROOT_PATH=/opt/host" >> /root/.vagrantrc
+      echo "export DOCKER_HOST_IP=#{control_ip}" >> /root/.vagrantrc
+      echo "source /root/.vagrantrc" >> /root/.bashrc
+      echo "cd /opt/host" >> /root/.bashrc
+    SHELL
+    control.vm.provision "fix script EOL", type: "shell", privileged: true, inline: <<-SHELL
+      dos2unix /opt/host/.adot/password-client.sh
+      chmod +x /opt/host/.adot/password-client.sh
+    SHELL
+  end
+
+  config.vm.define "win-host", autostart: false do |host|
+    setting=settings['vm']['hosts']['win-host']
+    host_setting=hosts['all']['children']['dev']['hosts']['win-host']
+    host.vm.box = setting['box']
+    host.vm.box_check_update = false
+    host.vm.network setting['network'], ip: host_setting['ansible_host']
+    host.vm.provider "virtualbox" do |vb|
+      vb.gui = true
+      vb.name = project_name + '-win-host'
+      vb.memory = setting['memory']
+      vb.customize ["modifyvm", :id, "--ioapic", "on", "--vram", "256", "--clipboard", "bidirectional"]
+      vb.cpus = setting['cpu']
+    end
+  end
+  config.vm.define "lin-host", autostart: false do |host|
+    setting=settings['vm']['hosts']['lin-host']
+    host_setting=hosts['all']['children']['dev']['hosts']['lin-host']
+    host.vm.box = setting['box']
+    host.vm.box_check_update = true
+    host.vm.network setting['network'], ip: host_setting['ansible_host'], :mac =>"0800278b58cc"
+    host.vm.provider "virtualbox" do |vb|
+      vb.gui = true
+      vb.name = project_name + '-lin-host'
+      vb.memory = setting['memory']
+      vb.customize ["modifyvm", :id, "--ioapic", "on", "--vram", "256", "--clipboard", "bidirectional"]
+      vb.cpus = setting['cpu']
+    end
+    host.vm.provision "install-net-tools", type: "shell", privileged: true, inline: "sudo apt install net-tools -y"
+  end
+end

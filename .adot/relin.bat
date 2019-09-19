@@ -1,0 +1,1 @@
+vagrant halt lin-host && vagrant destroy -f lin-host && vagrant up lin-host

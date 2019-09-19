@@ -1,0 +1,2 @@
+---
+ws_passwd: "{{vault_ws_passwd}}"

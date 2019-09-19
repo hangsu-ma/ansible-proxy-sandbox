@@ -1,0 +1,9 @@
+# Created by .ignore support plugin (hsz.mobi)
+.idea
+*.iml
+.vagrant
+*.retry
+*.pyc
+.history
+/.gradle/
+.adot/secrets

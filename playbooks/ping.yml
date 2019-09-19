@@ -1,0 +1,7 @@
+---
+- name: ping Linux
+  ping:
+  when: ansible_system == "Linux"
+- name: ping Windows
+  win_ping:
+  when: ansible_system == "Win32NT"

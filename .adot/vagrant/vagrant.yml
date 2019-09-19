@@ -1,0 +1,22 @@
+vm:
+  shared:
+    root_pw: 'vagrant'
+  control:
+    box: 'bento/centos-7.4'
+    network: 'public_network'
+    memory: 8196
+    cpu: 4
+  hosts:
+    lin-host:
+#      box: 'ubuntu/bionic64'
+#      box: 'bento/ubuntu-18.04'
+      box: 'peru/ubuntu-18.04-desktop-amd64'
+      network: 'public_network'
+      memory: 8196
+      cpu: 8
+    win-host:
+#      box: 'jborean93/WindowsServer2019'
+      box: 'StefanScherer/windows_10'
+      network: 'public_network'
+      memory: 8196
+      cpu: 4

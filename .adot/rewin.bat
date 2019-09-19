@@ -1,0 +1,1 @@
+vagrant halt win-host && vagrant destroy -f win-host && vagrant up win-host
