@@ -29,3 +29,9 @@ Author Information
 Hangsu Ma
 
 hangsu.ma@beag.biz
+
+
+This project provides a vagrant box with tiny proxy as proxy server.
+
+start with  host.vm.network private_network, ip: 192.169.0.18
+disconnect the cable for NAT
