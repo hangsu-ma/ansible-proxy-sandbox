@@ -34,13 +34,13 @@ Vagrant.configure(2) do |config|
     end
 
     control.vm.provision "install tinyproxy", type: "shell", privileged: true, inline: <<-SHELL
+      apt update
       apt install dos2unix net-tools tinyproxy vim -y
       sed -i 's/Allow 127.0.0.1/#Allow  127.0.0.1/g' /etc/tinyproxy/tinyproxy.conf
       service tinyproxy reload
       service tinyproxy restart
     SHELL
     control.vm.provision "install ansible", type: "shell", privileged: true, inline: <<-SHELL
-      apt update
       apt install software-properties-common
       apt-add-repository --yes --update ppa:ansible/ansible
       apt install ansible -y
