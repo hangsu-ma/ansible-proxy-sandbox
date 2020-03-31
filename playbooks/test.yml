@@ -4,8 +4,5 @@
   gather_subset:
     - "!hardware"
   tasks:
-  - name: demo customer filter
-    debug:
-      msg: "{{'custom_filter'|hello('random')}}"
   - name: include default test script, ping!
     include_tasks: ping.yml

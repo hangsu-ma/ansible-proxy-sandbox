@@ -18,13 +18,6 @@ Vagrant.configure(2) do |config|
 
     control.vm.provision 'shell', inline: 'echo "root:vagrant" | chpasswd'
 
-    control.vm.synced_folder "../playbooks", "/opt/host/playbooks"
-    control.vm.synced_folder "../templates", "/opt/host/templates"
-    control.vm.synced_folder "../vars", "/opt/host/vars"
-    control.vm.synced_folder "../filter_plugins", "/opt/host/filter_plugins"
-    control.vm.synced_folder "../inventories", "/opt/host/inventories"
-    control.vm.synced_folder "../.adot", "/opt/host/.adot"
-
     control.vm.provider "virtualbox" do |vb|
       vb.gui = true
       vb.name = project_name + '-proxy'
@@ -40,16 +33,22 @@ Vagrant.configure(2) do |config|
       service tinyproxy reload
       service tinyproxy restart
     SHELL
+
+    control.vm.synced_folder "../playbooks", "/etc/ansible/playbooks"
     control.vm.provision "install ansible", type: "shell", privileged: true, inline: <<-SHELL
       apt install software-properties-common
       apt-add-repository --yes --update ppa:ansible/ansible
       apt install ansible -y
+      echo "cd /etc/ansible" >> /home/vagrant/.bashrc
+      ln -snf /etc/ansible/playbooks/ping.yml /etc/ansible/ping.yml
+      ln -snf /etc/ansible/playbooks/test.yml /etc/ansible/test.yml
     SHELL
+    control.vm.synced_folder "../inventories", "/etc/ansible/hosts"
   end
 
   config.vm.define "lin-host-18.04", autostart: true do |host|
     setting=settings['vm']['hosts']['lin-host-18.04']
-    host_setting=hosts['all']['children']['dev']['hosts']['lin-host']
+    host_setting=hosts['all']['children']['dev']['hosts']['lin-host-18.04']
     host.vm.box = setting['box']
     host.vm.box_check_update = false
     host.vm.network setting['network'], ip: host_setting['ansible_host']
