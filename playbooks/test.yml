@@ -34,11 +34,10 @@
       repo: 'ppa:nginx/stable'
       state: present
       codename: trusty
-      update_cache: no
     become: yes
     environment:
-      http_proxy: 192.168.0.1:8888
-      https_proxy: 192.168.0.1:8888
+      http_proxy: http://192.168.0.1:8888
+      https_proxy: http://192.168.0.1:8888
     register: ret
     ignore_errors: yes
   - debug:
@@ -51,8 +50,8 @@
       codename: trusty
     become: yes
     environment:
-      http_proxy: 192.168.0.1:8888
-      https_proxy: 192.168.0.1:8888
+      http_proxy: http://192.168.0.1:8888
+      https_proxy: http://192.168.0.1:8888
     register: ret
     ignore_errors: yes
   - debug:
