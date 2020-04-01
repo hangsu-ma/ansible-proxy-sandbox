@@ -6,3 +6,56 @@
   tasks:
   - name: include default test script, ping!
     include_tasks: ping.yml
+  - name: adding test apt repo without proxy
+    apt_repository:
+      repo: 'ppa:nginx/stable'
+      state: present
+      codename: trusty
+    become: yes
+    register: ret
+    ignore_errors: yes
+  - debug:
+      var: ret
+
+  - name: removing test apt repo without proxy
+    apt_repository:
+      repo: 'ppa:nginx/stable'
+      state: absent
+      codename: trusty
+    become: yes
+    register: ret
+    ignore_errors: yes
+  - debug:
+      var: ret
+
+
+  - name: adding test apt repo with proxy
+    apt_repository:
+      repo: 'ppa:nginx/stable'
+      state: present
+      codename: trusty
+      update_cache: no
+    become: yes
+    environment:
+      http_proxy: 192.168.0.1:8888
+      https_proxy: 192.168.0.1:8888
+    register: ret
+    ignore_errors: yes
+  - debug:
+      var: ret
+
+  - name: removing test apt repo with proxy
+    apt_repository:
+      repo: 'ppa:nginx/stable'
+      state: absent
+      codename: trusty
+    become: yes
+    environment:
+      http_proxy: 192.168.0.1:8888
+      https_proxy: 192.168.0.1:8888
+    register: ret
+    ignore_errors: yes
+  - debug:
+      var: ret
+
+#apt cache update fail with proxy?

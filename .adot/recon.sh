@@ -1,1 +1,1 @@
-vagrant halt control && vagrant destroy -f control && vagrant up control && vagrant ssh control
+vagrant halt control && vagrant destroy -f control && vagrant up control
