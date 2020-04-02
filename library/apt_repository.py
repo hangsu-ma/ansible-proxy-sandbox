@@ -43,6 +43,18 @@ options:
             - Run the equivalent of C(apt-get update) when a change occurs.  Cache updates are run after making changes.
         type: bool
         default: "yes"
+    update_cache_retries:
+        description:
+        - Amount of retries if the cache update fails. Also see I(update_cache_retry_max_delay).
+        type: int
+        default: 5
+        version_added: '2.10'
+    update_cache_retry_max_delay:
+        description:
+        - Use an exponential backoff delay for each retry (see I(update_cache_retries)) up to this max delay in seconds.
+        type: int
+        default: 12
+        version_added: '2.10'
     validate_certs:
         description:
             - If C(no), SSL certificates for the target repo will not be validated. This should only be used
@@ -108,6 +120,9 @@ import os
 import re
 import sys
 import tempfile
+import copy
+import random
+import time
 
 try:
     import apt
@@ -184,7 +199,6 @@ class SourcesList(object):
             for n, valid, enabled, source, comment in sources:
                 if valid:
                     yield file, n, enabled, source, comment
-        raise StopIteration
 
     def _expand_path(self, filename):
         if '/' in filename:
@@ -282,6 +296,11 @@ class SourcesList(object):
         for filename, sources in list(self.files.items()):
             if sources:
                 d, fn = os.path.split(filename)
+                try:
+                    os.makedirs(d)
+                except OSError as err:
+                    if not os.path.isdir(d):
+                        self.module.fail_json("Failed to create directory %s: %s" % (d, to_native(err)))
                 fd, tmp_path = tempfile.mkstemp(prefix=".%s-" % fn, dir=d)
 
                 f = os.fdopen(fd, 'w')
@@ -426,6 +445,8 @@ class UbuntuSourcesList(SourcesList):
             no_proxy=keyserver.ubuntu.com, .ubuntu.com, ubuntu.com.
         :return: True if no_proxy contains default ubuntu key server
         """
+        if no_proxy is None:
+            return False
         import re
         # remove trailing ports from key server, example :80
         k = re.sub(r':\d+$', '', self.KEY_SERVER, re.UNICODE)
@@ -460,9 +481,9 @@ class UbuntuSourcesList(SourcesList):
                 if not self._key_already_exists(info['signing_key_fingerprint']):
                     if os.environ.get('http_proxy') and not self.keyserver_in_no_proxy(os.environ.get('no_proxy')):
                         command = ['apt-key', 'adv', '--keyserver-options', 'http-proxy=%s' % os.environ.get('http_proxy'),
-                                   '--recv-keys', '--keyserver', self.KEY_SERVER, info['signing_key_fingerprint']]
+                                   '--recv-keys', '--no-tty', '--keyserver', self.KEY_SERVER, info['signing_key_fingerprint']]
                     else:
-                        command = ['apt-key', 'adv', '--recv-keys', '--keyserver', self.KEY_SERVER,
+                        command = ['apt-key', 'adv', '--recv-keys', '--no-tty', '--keyserver', self.KEY_SERVER,
                                    info['signing_key_fingerprint']]
                     self.add_ppa_signing_keys_callback(command)
 
@@ -510,6 +531,17 @@ def get_add_ppa_signing_key_callback(module):
         return _run_command
 
 
+def revert_sources_list(sources_before, sources_after, sourceslist_before):
+    '''Revert the sourcelist files to their previous state.'''
+
+    # First remove any new files that were created:
+    for filename in set(sources_after.keys()).difference(sources_before.keys()):
+        if os.path.exists(filename):
+            os.remove(filename)
+    # Now revert the existing files to their former state:
+    sourceslist_before.save()
+
+
 def main():
     module = AnsibleModule(
         argument_spec=dict(
@@ -517,6 +549,8 @@ def main():
             state=dict(type='str', default='present', choices=['absent', 'present']),
             mode=dict(type='raw'),
             update_cache=dict(type='bool', default=True, aliases=['update-cache']),
+            update_cache_retries=dict(type='int', default=5),
+            update_cache_retry_max_delay=dict(type='int', default=12),
             filename=dict(type='str'),
             # This should not be needed, but exists as a failsafe
             install_python_apt=dict(type='bool', default=True),
@@ -548,6 +582,7 @@ def main():
     else:
         module.fail_json(msg='Module apt_repository is not supported on target.')
 
+    sourceslist_before = copy.deepcopy(sourceslist)
     sources_before = sourceslist.dump()
 
     try:
@@ -575,9 +610,30 @@ def main():
         try:
             sourceslist.save()
             if update_cache:
-                cache = apt.Cache()
-                cache.update()
-        except OSError as err:
+                err = ''
+                update_cache_retries = module.params.get('update_cache_retries')
+                update_cache_retry_max_delay = module.params.get('update_cache_retry_max_delay')
+                randomize = random.randint(0, 1000) / 1000.0
+
+                for retry in range(update_cache_retries):
+                    try:
+                        cache = apt.Cache()
+                        cache.update()
+                        break
+                    except apt.cache.FetchFailedException as e:
+                        err = to_native(e)
+
+                    # Use exponential backoff with a max fail count, plus a little bit of randomness
+                    delay = 2 ** retry + randomize
+                    if delay > update_cache_retry_max_delay:
+                        delay = update_cache_retry_max_delay + randomize
+                    time.sleep(delay)
+                else:
+                    revert_sources_list(sources_before, sources_after, sourceslist_before)
+                    module.fail_json(msg='Failed to update apt cache: %s' % (err if err else 'unknown reason'))
+
+        except (OSError, IOError) as err:
+            revert_sources_list(sources_before, sources_after, sourceslist_before)
             module.fail_json(msg=to_native(err))
 
     module.exit_json(changed=changed, repo=repo, state=state, diff=diff)
