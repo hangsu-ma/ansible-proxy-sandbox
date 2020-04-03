@@ -1,1 +1,1 @@
-vagrant halt lin-host-18.04 && vagrant destroy -f lin-host-18.04 && vagrant up lin-host-18.04
+vagrant halt /lin-host-.*/ && vagrant destroy -f /lin-host-.*/ && vagrant up /lin-host-.*/

@@ -26,7 +26,12 @@ Vagrant.configure(2) do |config|
     control.vm.box = setting['box']
     control.vm.box_check_update = true
     control.vm.network setting['network'], bridge: "eno2"
-    control.vm.network "forwarded_port", guest: 8888, host: 8888
+    control.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "tcp"
+    control.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "udp"
+    control.vm.network "forwarded_port", guest: 3128, host: 3128, protocol: "tcp"
+    control.vm.network "forwarded_port", guest: 3128, host: 3128, protocol: "udp"
+    control.vm.network "forwarded_port", guest: 11371, host: 11371, protocol: "tcp"
+    control.vm.network "forwarded_port", guest: 11371, host: 11371, protocol: "udp"
 
     control.vm.provision 'shell', inline: 'echo "root:vagrant" | chpasswd'
 
@@ -47,31 +52,32 @@ Vagrant.configure(2) do |config|
     SHELL
   end
 
-  config.vm.define "lin-host-18.04", autostart: true do |host|
-    setting=settings['vm']['hosts']['lin-host-18.04']
-    host_setting=hosts['all']['children']['dev']['hosts']['lin-host-18.04']
-    host.vm.box = setting['box']
-    host.vm.box_check_update = false
-    host.vm.network setting['network'], ip: host_setting['ansible_host']
-    host.vm.provider "virtualbox" do |vb|
-      vb.gui = true
-      vb.name = project_name + '-lin-host-18.04'
-      vb.memory = setting['memory']
-      vb.customize ["modifyvm", :id, "--ioapic", "on", "--vram", "256", "--clipboard-mode", "bidirectional"]
-      vb.customize ["modifyvm", :id, "--natdnshostresolver1", "off"]
-      vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
-      vb.cpus = setting['cpu']
+  settings['vm']['hosts'].each do |hostname,setting|
+    config.vm.define hostname, autostart: true do |host|
+      host_setting=hosts['all']['children']['dev']['hosts'][hostname]
+      host.vm.box = setting['box']
+      host.vm.box_check_update = false
+      host.vm.network setting['network'], ip: host_setting['ansible_host']
+      host.vm.provider "virtualbox" do |vb|
+        vb.gui = true
+        vb.name = project_name + '-' + hostname
+        vb.memory = setting['memory']
+        vb.customize ["modifyvm", :id, "--ioapic", "on", "--vram", "256", "--clipboard-mode", "bidirectional"]
+        vb.customize ["modifyvm", :id, "--natdnshostresolver1", "off"]
+        vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
+        vb.cpus = setting['cpu']
+      end
+      host.vm.provision "install-net-tools", type: "shell", privileged: true, inline: "sudo apt install net-tools -y"
+      host.vm.provision "config-proxy", type: "shell", privileged: true, inline: <<-SHELL
+      echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
+      echo "export https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
+      echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /root/.bashrc
+      echo "export https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /root/.bashrc
+      echo "http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /etc/environment
+      echo "https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /etc/environment
+      SHELL
     end
-    host.vm.provision "install-net-tools", type: "shell", privileged: true, inline: "sudo apt install net-tools -y"
-    host.vm.provision "config-proxy", type: "shell", privileged: true, inline: <<-SHELL
-      echo "export http_proxy=http://192.168.0.1:8888" >> /home/vagrant/.bashrc
-      echo "export HTTP_PROXY=http://192.168.0.1:8888" >> /home/vagrant/.bashrc
-      echo "export https_proxy=http://192.168.0.1:8888" >> /home/vagrant/.bashrc
-      echo "export HTTPS_PROXY=http://192.168.0.1:8888" >> /home/vagrant/.bashrc
-      echo "export http_proxy=http://192.168.0.1:8888" >> /root/.bashrc
-      echo "export HTTP_PROXY=http://192.168.0.1:8888" >> /root/.bashrc
-      echo "export https_proxy=http://192.168.0.1:8888" >> /root/.bashrc
-      echo "export HTTPS_PROXY=http://192.168.0.1:8888" >> /root/.bashrc
-    SHELL
   end
+
+
 end
