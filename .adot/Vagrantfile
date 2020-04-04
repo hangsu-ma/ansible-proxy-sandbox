@@ -8,18 +8,6 @@ project_name = File.basename(File.dirname(File.expand_path("../", __FILE__)))
 Vagrant.configure(2) do |config|
   config.ssh.insert_key = 'true'
   config.ssh.keep_alive = 'true'
-  config.vm.synced_folder "../playbooks", "/etc/ansible/playbooks"
-  config.vm.provision "install ansible", type: "shell", privileged: true, inline: <<-SHELL
-      apt install software-properties-common
-      apt-add-repository --yes --update ppa:ansible/ansible
-      apt install ansible -y
-      echo "cd /etc/ansible" >> /home/vagrant/.bashrc
-      ln -snf /etc/ansible/playbooks/ping.yml /etc/ansible/ping.yml
-      ln -snf /etc/ansible/playbooks/test.yml /etc/ansible/test.yml
-  SHELL
-  config.vm.synced_folder "../inventories", "/etc/ansible/hosts"
-  config.vm.synced_folder "../library", "/etc/ansible/library2"
-
 
   config.vm.define "control", primary: true do |control|
     setting=settings['vm']['proxy-host']
@@ -28,32 +16,48 @@ Vagrant.configure(2) do |config|
     control.vm.network setting['network'], bridge: "eno2"
     control.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "tcp"
     control.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "udp"
-    control.vm.network "forwarded_port", guest: 3128, host: 3128, protocol: "tcp"
-    control.vm.network "forwarded_port", guest: 3128, host: 3128, protocol: "udp"
-    control.vm.network "forwarded_port", guest: 11371, host: 11371, protocol: "tcp"
-    control.vm.network "forwarded_port", guest: 11371, host: 11371, protocol: "udp"
+    control.vm.network "forwarded_port", guest: 53, host: 53, protocol: "tcp"
+    control.vm.network "forwarded_port", guest: 53, host: 53, protocol: "udp"
 
     control.vm.provision 'shell', inline: 'echo "root:vagrant" | chpasswd'
 
     control.vm.provider "virtualbox" do |vb|
-      vb.gui = true
+      vb.gui = false
       vb.name = project_name + '-proxy'
       vb.memory = setting['memory']
       vb.customize ["modifyvm", :id, "--ioapic", "on", "--vram", "256"]
       vb.cpus = setting['cpu']
     end
 
-    control.vm.provision "install tinyproxy", type: "shell", privileged: true, inline: <<-SHELL
+    control.vm.provision "install proxy", type: "shell", privileged: true, inline: <<-SHELL
       apt update
       apt install dos2unix net-tools tinyproxy vim -y
       sed -i 's/Allow 127.0.0.1/#Allow  127.0.0.1/g' /etc/tinyproxy/tinyproxy.conf
       service tinyproxy reload
       service tinyproxy restart
     SHELL
+    control.vm.provision "config nameserver", type: "shell", privileged: true, inline: <<-SHELL
+      systemctl stop systemd-resolved
+      sed -i 's/#DNS=/DNS=#{setting['proxy_ip']}/g' /etc/systemd/resolved.conf
+      sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf
+      ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+      systemctl start systemd-resolved
+      echo '      nameservers:'>>/etc/netplan/01-netcfg.yaml 
+      echo '        addresses: [#{setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml
+      netplan apply
+    SHELL
+
+    control.vm.provision "unbound-conf", type: "file", source: "vagrant/unbound.conf", destination: "/tmp/unbound.conf"
+    control.vm.provision "install DNS server", type: "shell", privileged: true, inline: <<-SHELL
+      apt install unbound -y
+      service unbound stop
+      cp /tmp/unbound.conf /etc/unbound/unbound.conf.d/test.conf
+      service unbound start
+    SHELL
   end
 
   settings['vm']['hosts'].each do |hostname,setting|
-    config.vm.define hostname, autostart: true do |host|
+    config.vm.define hostname, autostart: false do |host|
       host_setting=hosts['all']['children']['dev']['hosts'][hostname]
       host.vm.box = setting['box']
       host.vm.box_check_update = false
@@ -67,14 +71,38 @@ Vagrant.configure(2) do |config|
         vb.customize ["modifyvm", :id, "--natdnsproxy1", "off"]
         vb.cpus = setting['cpu']
       end
+      host.vm.synced_folder "../playbooks", "/etc/ansible/playbooks"
+      host.vm.provision "install ansible", type: "shell", privileged: true, inline: <<-SHELL
+        apt update
+        apt install software-properties-common -y
+        apt-add-repository --yes --update ppa:ansible/ansible
+        apt install ansible -y
+        echo "cd /etc/ansible" >> /home/vagrant/.bashrc
+        ln -snf /etc/ansible/playbooks/ping.yml /etc/ansible/ping.yml
+        ln -snf /etc/ansible/playbooks/test.yml /etc/ansible/test.yml
+      SHELL
+      host.vm.synced_folder "../inventories", "/etc/ansible/hosts"
+      host.vm.synced_folder "../library", "/etc/ansible/library2"
       host.vm.provision "install-net-tools", type: "shell", privileged: true, inline: "sudo apt install net-tools -y"
+
+      host.vm.provision "config nameserver", type: "shell", privileged: true, inline: <<-SHELL
+        systemctl stop systemd-resolved
+        sed -i 's/#DNS=/DNS=#{setting['proxy_ip']}/g' /etc/systemd/resolved.conf
+        sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf
+        ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+        systemctl start systemd-resolved
+        echo '      nameservers:'>>/etc/netplan/01-netcfg.yaml 
+        echo '        addresses: [#{setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml
+        netplan apply
+      SHELL
+
       host.vm.provision "config-proxy", type: "shell", privileged: true, inline: <<-SHELL
-      echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
-      echo "export https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
-      echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /root/.bashrc
-      echo "export https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /root/.bashrc
-      echo "http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /etc/environment
-      echo "https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /etc/environment
+        echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
+        echo "export https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
+        echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /root/.bashrc
+        echo "export https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /root/.bashrc
+        echo "http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /etc/environment
+        echo "https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /etc/environment
       SHELL
     end
   end
