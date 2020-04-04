@@ -1,1 +1,1 @@
-vagrant halt control && vagrant destroy -f control && vagrant up control
+sudo vagrant halt control && sudo vagrant destroy -f control && sudo vagrant up control

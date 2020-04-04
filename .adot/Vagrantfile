@@ -96,7 +96,7 @@ Vagrant.configure(2) do |config|
         netplan apply
       SHELL
 
-      host.vm.provision "config-proxy", type: "shell", privileged: true, inline: <<-SHELL
+      host.vm.provision "config-proxy", type: "shell", privileged: true, run: "never", inline: <<-SHELL
         echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
         echo "export https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
         echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /root/.bashrc

@@ -8,17 +8,10 @@ vm:
     cpu: 8
     proxy_ip: 192.168.0.1
   hosts:
-    lin-host-18.04-1:
+    lin-host-18.04:
       box: 'peru/ubuntu-18.04-desktop-amd64'
       network: 'private_network'
       memory: 8196
       cpu: 4
       proxy_ip: 192.168.0.1
       proxy_port: 8888
-#    lin-host-18.04-2:
-#      box: 'peru/ubuntu-18.04-desktop-amd64'
-#      network: 'private_network'
-#      memory: 8196
-#      cpu: 4
-#      proxy_ip: 192.168.0.1
-#      proxy_port: 3128
