@@ -107,8 +107,16 @@ EXAMPLES = '''
     id: 9FED2BCBDCD29CDF762678CBAED4B06F473041FA
     file: /tmp/apt.gpg
     state: present
+
+- name: Working behind a proxy, using environment
+  apt_key:
+    keyserver: keyserver.ubuntu.com
+    id: 41BD8711B1F0EC2B0D85B91CF59CE3A8323293EE
+  environment:
+    http_proxy: http://proxy.example.com:8080
 '''
 
+from os import environ
 
 # FIXME: standardize into module_common
 from traceback import format_exc
@@ -131,6 +139,51 @@ def find_needed_binaries(module):
     # installed, /usr/bin/apt-key fails?)
     module.get_bin_path('gpg', required=True)
     module.get_bin_path('grep', required=True)
+
+
+def in_no_proxy(module, server, no_proxy):
+    """ check if given server url is included in the no_proxy list.
+    No DNS lookup is carried out at this stage.
+
+    :param server: domain name, hostname or IP. Port is supported.
+    :param no_proxy: list of comma separated URL. Support domain name, IP, subnet range, wildcard *, trailing and leading .
+    example:
+        no_proxy=example.com, .example.com, 192.168.56., 192.168.*.4, 127.0.0.0/8
+    :return: True if no_proxy contains key_server
+    """
+    urls = no_proxy.split(',')
+    import re
+    # remove trailing ports from key server, example :80
+    k = re.sub(r':\d+$', '', server, re.UNICODE)
+    # remove leading protocal, example: hkp://keyserver.ubuntu.com
+    k = re.sub(r'^\w+://', '', k, re.UNICODE)
+    for url in urls:
+        u = url.strip()
+        if k == u:
+            return True
+        elif u.startswith('.') and k.endswith(u):
+            return True
+        elif u.endswith('.') and k.startswith(u):
+            return True
+            # the subnet has to be valid, no host should be set here
+        elif re.match(r'\d+.\d+.\d+.\d+/\d+', u) and re.match(r'\d+.\d+.\d+.\d+', k):
+            try:
+                import ipaddress
+                from ansible.module_utils._text import to_text
+                if ipaddress.ip_address(to_text(k)) in ipaddress.ip_network(to_text(u)):
+                    return True
+            except ImportError as err:
+                module.fail_json(msg="Missing dependency python module: %s" % err)
+            except ValueError as err:
+                module.fail_json(msg="error parsing IP: %s" % err)
+        elif '*' in u:
+            try:
+                prog = re.compile(u.replace('*', '.*'))
+                if prog.match(k):
+                    return True
+            except re.error as err:
+                pass
+    return False
 
 
 def parse_key_id(key_id):
@@ -201,7 +254,7 @@ def shorten_key_ids(key_id_list):
 
 
 def download_key(module, url):
-    # FIXME: move get_url code to common, allow for in-memory D/L, support proxies
+    # FIXME: move get_url code to common, allow for in-memory D/L
     # and reuse here
     if url is None:
         module.fail_json(msg="needed a URL but was not specified")
@@ -217,10 +270,16 @@ def download_key(module, url):
 
 
 def import_key(module, keyring, keyserver, key_id):
-    if keyring:
-        cmd = "%s --keyring %s adv --no-tty --keyserver %s --recv %s" % (apt_key_bin, keyring, keyserver, key_id)
+    if environ.get('http_proxy') and not in_no_proxy(module, keyserver, environ.get('no_proxy')):
+        cmd = "adv --no-tty --keyserver-options 'http-proxy=%s' --keyserver %s --recv %s" % (environ.get('http_proxy'), keyserver, key_id)
     else:
-        cmd = "%s adv --no-tty --keyserver %s --recv %s" % (apt_key_bin, keyserver, key_id)
+        cmd = "adv --no-tty --keyserver %s --recv %s" % (keyserver, key_id)
+
+    if keyring:
+        cmd = "%s --keyring %s %s" % (apt_key_bin, keyring, cmd)
+    else:
+        cmd = "%s %s" % (apt_key_bin, cmd)
+
     for retry in range(5):
         lang_env = dict(LANG='C', LC_ALL='C', LC_MESSAGES='C')
         (rc, out, err) = module.run_command(cmd, environ_update=lang_env)
