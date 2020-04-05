@@ -108,7 +108,7 @@ EXAMPLES = '''
     file: /tmp/apt.gpg
     state: present
 
-- name: Working behind a proxy, using environment
+- name: Working behind a proxy
   apt_key:
     keyserver: keyserver.ubuntu.com
     id: 41BD8711B1F0EC2B0D85B91CF59CE3A8323293EE
@@ -151,6 +151,9 @@ def in_no_proxy(module, server, no_proxy):
         no_proxy=example.com, .example.com, 192.168.56., 192.168.*.4, 127.0.0.0/8
     :return: True if no_proxy contains key_server
     """
+    if no_proxy is None:
+        return False
+
     urls = no_proxy.split(',')
     import re
     # remove trailing ports from key server, example :80
