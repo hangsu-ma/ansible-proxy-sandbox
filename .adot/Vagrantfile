@@ -80,6 +80,9 @@ Vagrant.configure(2) do |config|
         echo "cd /etc/ansible" >> /home/vagrant/.bashrc
         ln -snf /etc/ansible/playbooks/ping.yml /etc/ansible/ping.yml
         ln -snf /etc/ansible/playbooks/test.yml /etc/ansible/test.yml
+        mkdir /etc/ansible/library
+        ln -snf /etc/ansible/library2/apt_key.py /etc/ansible/library/apt_key.py
+        ln -snf /etc/ansible/library2/apt_repository.py /etc/ansible/library/apt_repository.py
       SHELL
       host.vm.synced_folder "../inventories", "/etc/ansible/hosts"
       host.vm.synced_folder "../library", "/etc/ansible/library2"
