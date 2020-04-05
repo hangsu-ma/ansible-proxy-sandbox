@@ -83,9 +83,12 @@ Vagrant.configure(2) do |config|
         mkdir /etc/ansible/library
         ln -snf /etc/ansible/library2/apt_key.py /etc/ansible/library/apt_key.py
         ln -snf /etc/ansible/library2/apt_repository.py /etc/ansible/library/apt_repository.py
+        mkdir -p /etc/ansible/module_utils/common
+        ln -snf /etc/ansible/module_utils2/common/network.py /etc/ansible/module_utils/common/network.py
       SHELL
       host.vm.synced_folder "../inventories", "/etc/ansible/hosts"
       host.vm.synced_folder "../library", "/etc/ansible/library2"
+      host.vm.synced_folder "../module_utils", "/etc/ansible/module_utils2"
       host.vm.provision "install-net-tools", type: "shell", privileged: true, inline: "sudo apt install net-tools -y"
 
       host.vm.provision "config nameserver", type: "shell", privileged: true, inline: <<-SHELL

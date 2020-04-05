@@ -137,6 +137,7 @@ except ImportError:
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils._text import to_native
 from ansible.module_utils.urls import fetch_url
+from ansible.module_utils.common.network import is_in_noproxy
 
 
 if sys.version_info[0] < 3:
@@ -435,38 +436,6 @@ class UbuntuSourcesList(SourcesList):
         rc, out, err = self.module.run_command('apt-key export %s' % key_fingerprint, check_rc=True)
         return len(err) == 0
 
-    def keyserver_in_no_proxy(self, no_proxy):
-        """ check if default ubuntu key server url is included in the no_proxy list.
-
-        No DNS lookup is carried out at this stage.
-
-        :param no_proxy: list of comma separated URL. Support domain name, wildcard *, leading .
-        example:
-            no_proxy=keyserver.ubuntu.com, .ubuntu.com, ubuntu.com.
-        :return: True if no_proxy contains default ubuntu key server
-        """
-        if no_proxy is None:
-            return False
-        import re
-        # remove trailing ports from key server, example :80
-        k = re.sub(r':\d+$', '', self.KEY_SERVER, re.UNICODE)
-        # remove leading protocal, example: hkp://keyserver.ubuntu.com
-        k = re.sub(r'^\w+://', '', k, re.UNICODE)
-        urls = no_proxy.split(',')
-        for url in urls:
-            u = url.strip()
-            if k == u:
-                return True
-            elif u.startswith('.') and k.endswith(u):
-                return True
-            elif '*' in u:
-                try:
-                    prog = re.compile(u.replace('*', '.*'))
-                    if prog.match(k):
-                        return True
-                except re.error as err:
-                    pass
-        return False
 
     def add_source(self, line, comment='', file=None):
         if line.startswith('ppa:'):
@@ -479,7 +448,7 @@ class UbuntuSourcesList(SourcesList):
             if self.add_ppa_signing_keys_callback is not None:
                 info = self._get_ppa_info(ppa_owner, ppa_name)
                 if not self._key_already_exists(info['signing_key_fingerprint']):
-                    if os.environ.get('http_proxy') and not self.keyserver_in_no_proxy(os.environ.get('no_proxy')):
+                    if os.environ.get('http_proxy') and not is_in_noproxy(self.KEY_SERVER, os.environ.get('no_proxy')):
                         command = ['apt-key', 'adv', '--keyserver-options', 'http-proxy=%s' % os.environ.get('http_proxy'),
                                    '--recv-keys', '--no-tty', '--keyserver', self.KEY_SERVER, info['signing_key_fingerprint']]
                     else:

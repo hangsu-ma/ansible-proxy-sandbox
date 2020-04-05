@@ -6,6 +6,8 @@
   tasks:
   - name: include default test script, ping!
     include_tasks: ping.yml
+
+
   - name: adding repo without proxy
     apt_repository:
       repo: 'ppa:nginx/stable'
@@ -56,6 +58,9 @@
     ignore_errors: yes
   - debug:
       var: ret
+
+
+
 
   - name: adding key without proxy
     apt_key:

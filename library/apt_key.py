@@ -124,7 +124,7 @@ from traceback import format_exc
 from ansible.module_utils.basic import AnsibleModule
 from ansible.module_utils._text import to_native
 from ansible.module_utils.urls import fetch_url
-
+from ansible.module_utils.common.network import is_in_noproxy
 
 apt_key_bin = None
 
@@ -139,54 +139,6 @@ def find_needed_binaries(module):
     # installed, /usr/bin/apt-key fails?)
     module.get_bin_path('gpg', required=True)
     module.get_bin_path('grep', required=True)
-
-
-def in_no_proxy(module, server, no_proxy):
-    """ check if given server url is included in the no_proxy list.
-    No DNS lookup is carried out at this stage.
-
-    :param server: domain name, hostname or IP. Port is supported.
-    :param no_proxy: list of comma separated URL. Support domain name, IP, subnet range, wildcard *, trailing and leading .
-    example:
-        no_proxy=example.com, .example.com, 192.168.56., 192.168.*.4, 127.0.0.0/8
-    :return: True if no_proxy contains key_server
-    """
-    if no_proxy is None:
-        return False
-
-    urls = no_proxy.split(',')
-    import re
-    # remove trailing ports from key server, example :80
-    k = re.sub(r':\d+$', '', server, re.UNICODE)
-    # remove leading protocal, example: hkp://keyserver.ubuntu.com
-    k = re.sub(r'^\w+://', '', k, re.UNICODE)
-    for url in urls:
-        u = url.strip()
-        if k == u:
-            return True
-        elif u.startswith('.') and k.endswith(u):
-            return True
-        elif u.endswith('.') and k.startswith(u):
-            return True
-            # the subnet has to be valid, no host should be set here
-        elif re.match(r'\d+.\d+.\d+.\d+/\d+', u) and re.match(r'\d+.\d+.\d+.\d+', k):
-            try:
-                import ipaddress
-                from ansible.module_utils._text import to_text
-                if ipaddress.ip_address(to_text(k)) in ipaddress.ip_network(to_text(u)):
-                    return True
-            except ImportError as err:
-                module.fail_json(msg="Missing dependency python module: %s" % err)
-            except ValueError as err:
-                module.fail_json(msg="error parsing IP: %s" % err)
-        elif '*' in u:
-            try:
-                prog = re.compile(u.replace('*', '.*'))
-                if prog.match(k):
-                    return True
-            except re.error as err:
-                pass
-    return False
 
 
 def parse_key_id(key_id):
@@ -273,7 +225,7 @@ def download_key(module, url):
 
 
 def import_key(module, keyring, keyserver, key_id):
-    if environ.get('http_proxy') and not in_no_proxy(module, keyserver, environ.get('no_proxy')):
+    if environ.get('http_proxy') and not is_in_noproxy(keyserver, environ.get('no_proxy')):
         cmd = "adv --no-tty --keyserver-options 'http-proxy=%s' --keyserver %s --recv %s" % (environ.get('http_proxy'), keyserver, key_id)
     else:
         cmd = "adv --no-tty --keyserver %s --recv %s" % (keyserver, key_id)
