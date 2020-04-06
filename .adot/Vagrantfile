@@ -9,19 +9,19 @@ Vagrant.configure(2) do |config|
   config.ssh.insert_key = 'true'
   config.ssh.keep_alive = 'true'
 
-  config.vm.define "control", primary: true do |control|
-    setting=settings['vm']['proxy-host']
-    control.vm.box = setting['box']
-    control.vm.box_check_update = true
-    control.vm.network setting['network'], bridge: "eno2"
-    control.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "tcp"
-    control.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "udp"
-    control.vm.network "forwarded_port", guest: 53, host: 53, protocol: "tcp"
-    control.vm.network "forwarded_port", guest: 53, host: 53, protocol: "udp"
+  config.vm.define "proxy-server", primary: true do |server|
+    setting=settings['vm']['proxy-server']
+    server.vm.box = setting['box']
+    server.vm.box_check_update = true
+    server.vm.network setting['network'], bridge: "eno2"
+    server.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "tcp"
+    server.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "udp"
+    server.vm.network "forwarded_port", guest: 53, host: 53, protocol: "tcp"
+    server.vm.network "forwarded_port", guest: 53, host: 53, protocol: "udp"
 
-    control.vm.provision 'shell', inline: 'echo "root:vagrant" | chpasswd'
+    server.vm.provision 'shell', inline: 'echo "root:vagrant" | chpasswd'
 
-    control.vm.provider "virtualbox" do |vb|
+    server.vm.provider "virtualbox" do |vb|
       vb.gui = false
       vb.name = project_name + '-proxy'
       vb.memory = setting['memory']
@@ -29,14 +29,14 @@ Vagrant.configure(2) do |config|
       vb.cpus = setting['cpu']
     end
 
-    control.vm.provision "install proxy", type: "shell", privileged: true, inline: <<-SHELL
+    server.vm.provision "install proxy", type: "shell", privileged: true, inline: <<-SHELL
       apt update
       apt install dos2unix net-tools tinyproxy vim -y
       sed -i 's/Allow 127.0.0.1/#Allow  127.0.0.1/g' /etc/tinyproxy/tinyproxy.conf
       service tinyproxy reload
       service tinyproxy restart
     SHELL
-    control.vm.provision "config nameserver", type: "shell", privileged: true, inline: <<-SHELL
+    server.vm.provision "config nameserver", type: "shell", privileged: true, inline: <<-SHELL
       systemctl stop systemd-resolved
       sed -i 's/#DNS=/DNS=#{setting['proxy_ip']}/g' /etc/systemd/resolved.conf
       sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf
@@ -47,11 +47,11 @@ Vagrant.configure(2) do |config|
       netplan apply
     SHELL
 
-    control.vm.provision "unbound-conf", type: "file", source: "vagrant/unbound.conf", destination: "/tmp/unbound.conf"
-    control.vm.provision "install DNS server", type: "shell", privileged: true, inline: <<-SHELL
+    server.vm.provision "unbound-conf", type: "file", source: "vagrant/unbound.conf", destination: "/tmp/unbound.conf"
+    server.vm.provision "install DNS server", type: "shell", privileged: true, inline: <<-SHELL
       apt install unbound -y
       service unbound stop
-      cp /tmp/unbound.conf /etc/unbound/unbound.conf.d/test.conf
+      cp /tmp/unbound.conf /etc/unbound/unbound.conf.d/freeforall.conf
       service unbound start
     SHELL
   end

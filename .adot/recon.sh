@@ -1,1 +1,1 @@
-sudo vagrant halt control && sudo vagrant destroy -f control && sudo vagrant up control
+sudo vagrant halt proxy-server && sudo vagrant destroy -f proxy-server && sudo vagrant up proxy-server

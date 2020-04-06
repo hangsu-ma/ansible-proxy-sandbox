@@ -1,7 +1,7 @@
 vm:
   shared:
     root_pw: 'vagrant'
-  proxy-host:
+  proxy-server:
     box: 'bento/ubuntu-18.04'
     network: 'public_network'
     memory: 8196
