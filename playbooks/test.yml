@@ -38,8 +38,7 @@
       codename: trusty
     become: yes
     environment:
-      http_proxy: http://192.168.0.1:8888
-      https_proxy: http://192.168.0.1:8888
+      http_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
     register: ret
     ignore_errors: yes
   - debug:
@@ -52,8 +51,7 @@
       codename: trusty
     become: yes
     environment:
-      http_proxy: http://192.168.0.1:8888
-      https_proxy: http://192.168.0.1:8888
+      http_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
     register: ret
     ignore_errors: yes
   - debug:
@@ -88,8 +86,7 @@
       keyserver: keyserver.ubuntu.com
       id: 41BD8711B1F0EC2B0D85B91CF59CE3A8323293EE
     environment:
-      http_proxy: http://192.168.0.1:8888
-      https_proxy: http://192.168.0.1:8888
+      http_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
     become: yes
     register: ret
     ignore_errors: yes
@@ -102,8 +99,7 @@
       id: 41BD8711B1F0EC2B0D85B91CF59CE3A8323293EE
       state: absent
     environment:
-      http_proxy: http://192.168.0.1:8888
-      https_proxy: http://192.168.0.1:8888
+      http_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
     become: yes
     register: ret
     ignore_errors: yes

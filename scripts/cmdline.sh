@@ -1,0 +1,1 @@
+apt-key adv -v --keyserver-options http-proxy=http://"$proxy_ip":"$proxy_port"  --recv-keys --keyserver hkp://keyserver.ubuntu.com:80 8B3981E7A6852F782CC4951600A6F0A3C300EE8C

@@ -70,16 +70,21 @@ Vagrant.configure(2) do |config|
         vb.cpus = setting['cpu']
       end
       host.vm.synced_folder "../playbooks", "/etc/ansible/playbooks"
+      host.vm.synced_folder "../scripts", "/etc/ansible/scripts"
       host.vm.synced_folder "../library", "/etc/ansible/library2"
       host.vm.synced_folder "../module_utils", "/etc/ansible/module_utils2"
       host.vm.provision "install ansible", type: "shell", privileged: true, inline: <<-SHELL
         apt update
-        apt install software-properties-common -y
+        apt install software-properties-common tee -y
         apt-add-repository --yes --update ppa:ansible/ansible
         apt install ansible -y
         echo "cd /etc/ansible" >> /home/vagrant/.bashrc
         ln -snf /etc/ansible/playbooks/ping.yml /etc/ansible/ping.yml
         ln -snf /etc/ansible/playbooks/test.yml /etc/ansible/test.yml
+        ln -snf /etc/ansible/scripts/test.sh /etc/ansible/test.sh
+        ln -snf /etc/ansible/scripts/cmdline.sh /etc/ansible/cmdline.sh
+        chmod +x /etc/ansible/cmdline.sh
+        chmod +x /etc/ansible/test.sh
         mkdir /etc/ansible/library
         ln -snf /etc/ansible/library2/apt_key.py /etc/ansible/library/apt_key.py
         ln -snf /etc/ansible/library2/apt_repository.py /etc/ansible/library/apt_repository.py
@@ -97,6 +102,15 @@ Vagrant.configure(2) do |config|
         echo '      nameservers:'>>/etc/netplan/01-netcfg.yaml 
         echo '        addresses: [#{setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml
         netplan apply
+      SHELL
+
+      host.vm.provision "config-env-vars", type: "shell", privileged: true, inline: <<-SHELL
+        echo "export proxy_ip=#{setting['proxy_ip']}" >> /home/vagrant/.bashrc
+        echo "export proxy_port=#{setting['proxy_port']}" >> /home/vagrant/.bashrc
+        echo "export proxy_ip=#{setting['proxy_ip']}" >> /root/.bashrc
+        echo "export proxy_port=#{setting['proxy_port']}" >> /root/.bashrc
+        echo "proxy_ip=#{setting['proxy_ip']}" >> /etc/environment
+        echo "proxy_port=#{setting['proxy_port']}" >> /etc/environment
       SHELL
 
       host.vm.provision "config-proxy", type: "shell", privileged: true, run: "never", inline: <<-SHELL
