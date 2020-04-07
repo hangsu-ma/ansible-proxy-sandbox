@@ -1,6 +1,6 @@
 ---
 - name: testing playbook
-  hosts: "{{ target_host | default('sandbox') }}"
+  hosts: localhost
   gather_subset:
     - "!hardware"
   tasks:

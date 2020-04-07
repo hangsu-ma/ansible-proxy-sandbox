@@ -3,7 +3,6 @@
 
 require 'yaml'
 settings = YAML.load_file './vagrant/vagrant.yml'
-hosts = YAML.load_file '../inventories/hosts.yml'
 project_name = File.basename(File.dirname(File.expand_path("../", __FILE__)))
 Vagrant.configure(2) do |config|
   config.ssh.insert_key = 'true'
@@ -58,10 +57,9 @@ Vagrant.configure(2) do |config|
 
   settings['vm']['hosts'].each do |hostname,setting|
     config.vm.define hostname, autostart: false do |host|
-      host_setting=hosts['all']['children']['dev']['hosts'][hostname]
       host.vm.box = setting['box']
       host.vm.box_check_update = false
-      host.vm.network setting['network'], ip: host_setting['ansible_host']
+      host.vm.network setting['network'], ip: setting['proxy_ip'][/\A\d+.\d+.\d+/] + ".4", netmask: "24"
       host.vm.provider "virtualbox" do |vb|
         vb.gui = true
         vb.name = project_name + '-' + hostname
@@ -72,6 +70,8 @@ Vagrant.configure(2) do |config|
         vb.cpus = setting['cpu']
       end
       host.vm.synced_folder "../playbooks", "/etc/ansible/playbooks"
+      host.vm.synced_folder "../library", "/etc/ansible/library2"
+      host.vm.synced_folder "../module_utils", "/etc/ansible/module_utils2"
       host.vm.provision "install ansible", type: "shell", privileged: true, inline: <<-SHELL
         apt update
         apt install software-properties-common -y
@@ -86,9 +86,6 @@ Vagrant.configure(2) do |config|
         mkdir -p /etc/ansible/module_utils/common
         ln -snf /etc/ansible/module_utils2/common/network.py /etc/ansible/module_utils/common/network.py
       SHELL
-      host.vm.synced_folder "../inventories", "/etc/ansible/hosts"
-      host.vm.synced_folder "../library", "/etc/ansible/library2"
-      host.vm.synced_folder "../module_utils", "/etc/ansible/module_utils2"
       host.vm.provision "install-net-tools", type: "shell", privileged: true, inline: "sudo apt install net-tools -y"
 
       host.vm.provision "config nameserver", type: "shell", privileged: true, inline: <<-SHELL
