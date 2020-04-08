@@ -8,13 +8,13 @@ Vagrant.configure(2) do |config|
   config.ssh.insert_key = 'true'
   config.ssh.keep_alive = 'true'
 
+  ps_setting=settings['vm']['proxy-server']
   config.vm.define "proxy-server", primary: true do |server|
-    setting=settings['vm']['proxy-server']
-    server.vm.box = setting['box']
+    server.vm.box = ps_setting['box']
     server.vm.box_check_update = true
-    server.vm.network setting['network'], bridge: "eno2"
-    server.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "tcp"
-    server.vm.network "forwarded_port", guest: 8888, host: 8888, protocol: "udp"
+    server.vm.network ps_setting['network'], bridge: "eno2"
+    server.vm.network "forwarded_port", guest: 8888, host: ps_setting['proxy_port'], protocol: "tcp"
+    server.vm.network "forwarded_port", guest: 8888, host: ps_setting['proxy_port'], protocol: "udp"
     server.vm.network "forwarded_port", guest: 53, host: 53, protocol: "tcp"
     server.vm.network "forwarded_port", guest: 53, host: 53, protocol: "udp"
 
@@ -23,9 +23,9 @@ Vagrant.configure(2) do |config|
     server.vm.provider "virtualbox" do |vb|
       vb.gui = false
       vb.name = project_name + '-proxy'
-      vb.memory = setting['memory']
+      vb.memory = ps_setting['memory']
       vb.customize ["modifyvm", :id, "--ioapic", "on", "--vram", "256"]
-      vb.cpus = setting['cpu']
+      vb.cpus = ps_setting['cpu']
     end
 
     server.vm.provision "install proxy", type: "shell", privileged: true, inline: <<-SHELL
@@ -37,12 +37,12 @@ Vagrant.configure(2) do |config|
     SHELL
     server.vm.provision "config nameserver", type: "shell", privileged: true, inline: <<-SHELL
       systemctl stop systemd-resolved
-      sed -i 's/#DNS=/DNS=#{setting['proxy_ip']}/g' /etc/systemd/resolved.conf
+      sed -i 's/#DNS=/DNS=#{ps_setting['proxy_ip']}/g' /etc/systemd/resolved.conf
       sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf
       ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
       systemctl start systemd-resolved
       echo '      nameservers:'>>/etc/netplan/01-netcfg.yaml 
-      echo '        addresses: [#{setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml
+      echo '        addresses: [#{ps_setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml
       netplan apply
     SHELL
 
@@ -59,7 +59,7 @@ Vagrant.configure(2) do |config|
     config.vm.define hostname, autostart: false do |host|
       host.vm.box = setting['box']
       host.vm.box_check_update = false
-      host.vm.network setting['network'], ip: setting['proxy_ip'][/\A\d+.\d+.\d+/] + ".4", netmask: "24"
+      host.vm.network setting['network'], ip: ps_setting['proxy_ip'][/\A\d+.\d+.\d+/] + ".4", netmask: "24"
       host.vm.provider "virtualbox" do |vb|
         vb.gui = true
         vb.name = project_name + '-' + hostname
@@ -95,31 +95,31 @@ Vagrant.configure(2) do |config|
 
       host.vm.provision "config nameserver", type: "shell", privileged: true, inline: <<-SHELL
         systemctl stop systemd-resolved
-        sed -i 's/#DNS=/DNS=#{setting['proxy_ip']}/g' /etc/systemd/resolved.conf
+        sed -i 's/#DNS=/DNS=#{ps_setting['proxy_ip']}/g' /etc/systemd/resolved.conf
         sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf
         ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
         systemctl start systemd-resolved
         echo '      nameservers:'>>/etc/netplan/01-netcfg.yaml 
-        echo '        addresses: [#{setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml
+        echo '        addresses: [#{ps_setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml
         netplan apply
       SHELL
 
       host.vm.provision "config-env-vars", type: "shell", privileged: true, inline: <<-SHELL
-        echo "export proxy_ip=#{setting['proxy_ip']}" >> /home/vagrant/.bashrc
-        echo "export proxy_port=#{setting['proxy_port']}" >> /home/vagrant/.bashrc
-        echo "export proxy_ip=#{setting['proxy_ip']}" >> /root/.bashrc
-        echo "export proxy_port=#{setting['proxy_port']}" >> /root/.bashrc
-        echo "proxy_ip=#{setting['proxy_ip']}" >> /etc/environment
-        echo "proxy_port=#{setting['proxy_port']}" >> /etc/environment
+        echo "export proxy_ip=#{ps_setting['proxy_ip']}" >> /home/vagrant/.bashrc
+        echo "export proxy_port=#{ps_setting['proxy_port']}" >> /home/vagrant/.bashrc
+        echo "export proxy_ip=#{ps_setting['proxy_ip']}" >> /root/.bashrc
+        echo "export proxy_port=#{ps_setting['proxy_port']}" >> /root/.bashrc
+        echo "proxy_ip=#{ps_setting['proxy_ip']}" >> /etc/environment
+        echo "proxy_port=#{ps_setting['proxy_port']}" >> /etc/environment
       SHELL
 
       host.vm.provision "config-proxy", type: "shell", privileged: true, run: "never", inline: <<-SHELL
-        echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
-        echo "export https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /home/vagrant/.bashrc
-        echo "export http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /root/.bashrc
-        echo "export https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /root/.bashrc
-        echo "http_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /etc/environment
-        echo "https_proxy=http://#{setting['proxy_ip']}:#{setting['proxy_port']}" >> /etc/environment
+        echo "export http_proxy=http://#{ps_setting['proxy_ip']}:#{ps_setting['proxy_port']}" >> /home/vagrant/.bashrc
+        echo "export https_proxy=http://#{ps_setting['proxy_ip']}:#{ps_setting['proxy_port']}" >> /home/vagrant/.bashrc
+        echo "export http_proxy=http://#{ps_setting['proxy_ip']}:#{ps_setting['proxy_port']}" >> /root/.bashrc
+        echo "export https_proxy=http://#{ps_setting['proxy_ip']}:#{ps_setting['proxy_port']}" >> /root/.bashrc
+        echo "http_proxy=http://#{ps_setting['proxy_ip']}:#{ps_setting['proxy_port']}" >> /etc/environment
+        echo "https_proxy=http://#{ps_setting['proxy_ip']}:#{ps_setting['proxy_port']}" >> /etc/environment
       SHELL
     end
   end

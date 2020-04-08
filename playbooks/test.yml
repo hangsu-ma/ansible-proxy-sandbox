@@ -39,6 +39,7 @@
     become: yes
     environment:
       http_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
+      https_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
     register: ret
     ignore_errors: yes
   - debug:
@@ -52,6 +53,7 @@
     become: yes
     environment:
       http_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
+      https_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
     register: ret
     ignore_errors: yes
   - debug:
@@ -87,6 +89,7 @@
       id: 41BD8711B1F0EC2B0D85B91CF59CE3A8323293EE
     environment:
       http_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
+      https_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
     become: yes
     register: ret
     ignore_errors: yes
@@ -100,6 +103,7 @@
       state: absent
     environment:
       http_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
+      https_proxy: "http://{{ proxy_ip }}:{{ proxy_port }}"
     become: yes
     register: ret
     ignore_errors: yes
