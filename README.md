@@ -49,12 +49,30 @@ I have some placeholder value which works on my PC, but not necessary works on a
 Usage
 -------
 
+1. make sure your port 53 is not used on PC _sudo netstat -tulpn | grep 53_
+2. if it's used, it's most likely _resolved_, follow the steps in Vagrantfile provisioner "config nameserver"
+below to free it up.
+    * _sudo systemctl stop systemd-resolved_
+    * _sudo sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf_
+    * _sudo ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf_
+    * _sudo systemctl start systemd-resolved_
+3. review and make configuration necessary changes in _.adot/vagrant/vagrant.yml_, make sure proxy port(default 8888) is not used on your PC
+4. going to project folder, _cd .adot_
+5. execute _./relin.sh_, this will destroy any existing lin-hosts and create fresh new ones
+6. execute _./recon.sh_, this will create proxy-server. It requires sudo without password.
+    Do a _sudo vagrant up proxy-server_ if your sudo needs password.
+7. HACKY! going to each lin-host virtualbox created, _Machine_ -> _Settings_ -> _Network_
+    Locating NAT Adapter, it's normally Adapter 1, click on _Advanced_, unselect _Cable Connected_ checkbox.
+    This will disconnect the vagrant box from internet.
+8. log into the vagrant box from GUI using username _vagrant_, password _vagrant_, _vagrant ssh_ won't work now
+9. run _./test.sh_, output will be saved in /tmp/result, tasks without proxy should fail, tasks with proxy should success. 
 
 License
 -------
 
 Copyright (c) 2020 Hangsu Ma
-Simplified BSD License (see licenses/simplified_bsd.txt or https://opensource.org/licenses/BSD-2-Clause)
+
+Simplified BSD License (https://opensource.org/licenses/BSD-2-Clause)
 
 Author Information
 ------------------
