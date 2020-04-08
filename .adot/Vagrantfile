@@ -12,7 +12,11 @@ Vagrant.configure(2) do |config|
   config.vm.define "proxy-server", primary: true do |server|
     server.vm.box = ps_setting['box']
     server.vm.box_check_update = true
-    server.vm.network ps_setting['network'], bridge: "eno2"
+    if ps_setting.key?('network_bridge') and !ps_setting['network_bridge'].to_s.strip.empty?
+      server.vm.network "public_network", bridge: ps_setting['network_bridge']
+    else
+      server.vm.network "public_network"
+    end
     server.vm.network "forwarded_port", guest: 8888, host: ps_setting['proxy_port'], protocol: "tcp"
     server.vm.network "forwarded_port", guest: 8888, host: ps_setting['proxy_port'], protocol: "udp"
     server.vm.network "forwarded_port", guest: 53, host: 53, protocol: "tcp"
@@ -35,6 +39,8 @@ Vagrant.configure(2) do |config|
       service tinyproxy reload
       service tinyproxy restart
     SHELL
+
+    # required to free up port 53 if it's used by resolved
     server.vm.provision "config nameserver", type: "shell", privileged: true, inline: <<-SHELL
       systemctl stop systemd-resolved
       sed -i 's/#DNS=/DNS=#{ps_setting['proxy_ip']}/g' /etc/systemd/resolved.conf
@@ -59,7 +65,7 @@ Vagrant.configure(2) do |config|
     config.vm.define hostname, autostart: false do |host|
       host.vm.box = setting['box']
       host.vm.box_check_update = false
-      host.vm.network setting['network'], ip: ps_setting['proxy_ip'][/\A\d+.\d+.\d+/] + ".4", netmask: "24"
+      host.vm.network "private_network", ip: ps_setting['proxy_ip'][/\A\d+.\d+.\d+/] + ".4", netmask: "24"
       host.vm.provider "virtualbox" do |vb|
         vb.gui = true
         vb.name = project_name + '-' + hostname
@@ -113,6 +119,8 @@ Vagrant.configure(2) do |config|
         echo "proxy_port=#{ps_setting['proxy_port']}" >> /etc/environment
       SHELL
 
+      # give you internet access through proxy after network cable disconnected
+      # not executed by default, use vagrant provision --provision-with config-proxy BOX_NAME to execute
       host.vm.provision "config-proxy", type: "shell", privileged: true, run: "never", inline: <<-SHELL
         echo "export http_proxy=http://#{ps_setting['proxy_ip']}:#{ps_setting['proxy_port']}" >> /home/vagrant/.bashrc
         echo "export https_proxy=http://#{ps_setting['proxy_ip']}:#{ps_setting['proxy_port']}" >> /home/vagrant/.bashrc
@@ -123,6 +131,5 @@ Vagrant.configure(2) do |config|
       SHELL
     end
   end
-
 
 end
