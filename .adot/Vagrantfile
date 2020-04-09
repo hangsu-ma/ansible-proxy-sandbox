@@ -47,9 +47,9 @@ Vagrant.configure(2) do |config|
       sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf
       ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
       systemctl start systemd-resolved
-      echo '      nameservers:'>>/etc/netplan/01-netcfg.yaml 
-      echo '        addresses: [#{ps_setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml
-      netplan apply
+      [[ -f /etc/netplan/01-netcfg.yaml ]] && echo '      nameservers:'>>/etc/netplan/01-netcfg.yaml || echo "no netplan"
+      [[ -f /etc/netplan/01-netcfg.yaml ]] && echo '        addresses: [#{ps_setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml || echo "no netplan"
+      [[ -f /etc/netplan/01-netcfg.yaml ]] && netplan apply || echo "no netplan"
     SHELL
 
     server.vm.provision "unbound-conf", type: "file", source: "vagrant/unbound.conf", destination: "/tmp/unbound.conf"
@@ -105,9 +105,9 @@ Vagrant.configure(2) do |config|
         sed -i 's/#DNSStubListener=yes/DNSStubListener=no/g' /etc/systemd/resolved.conf
         ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
         systemctl start systemd-resolved
-        echo '      nameservers:'>>/etc/netplan/01-netcfg.yaml 
-        echo '        addresses: [#{ps_setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml
-        netplan apply
+        [[ -f /etc/netplan/01-netcfg.yaml ]] && echo '      nameservers:'>>/etc/netplan/01-netcfg.yaml || echo "no netplan"
+        [[ -f /etc/netplan/01-netcfg.yaml ]] && echo '        addresses: [#{ps_setting['proxy_ip']}]'>>/etc/netplan/01-netcfg.yaml || echo "no netplan"
+        [[ -f /etc/netplan/01-netcfg.yaml ]] && netplan apply || echo "no netplan"
       SHELL
 
       host.vm.provision "config-env-vars", type: "shell", privileged: true, inline: <<-SHELL

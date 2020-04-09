@@ -63,7 +63,8 @@ below to free it up.
     Do a _sudo vagrant up proxy-server_ if your sudo needs password.
 7. HACKY! going to each lin-host virtualbox created, _Machine_ -> _Settings_ -> _Network_
     Locating NAT Adapter, it's normally Adapter 1, click on _Advanced_, unselect _Cable Connected_ checkbox.
-    This will disconnect the vagrant box from internet.
+    This will disconnect the vagrant box from internet. If you want to test proxy in shell, run _config-proxy_ provisioner to 
+    config proxy environment variables before disconnect cable.
 8. log into the vagrant box from GUI using username _vagrant_, password _vagrant_, _vagrant ssh_ won't work now
 9. run _./test.sh_, output will be saved in /tmp/result, tasks without proxy should fail, tasks with proxy should success. 
 
